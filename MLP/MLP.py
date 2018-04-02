@@ -1,11 +1,8 @@
 import numpy as np
 import tensorflow as tf
 import random
+import os
 
-#generate test data
-#list of 100 random numbers from 1 - 100
-data = []
-data = np.random.randint(100, size=100)
 
 """
    Input     Hidden1           Hidden2            Output
@@ -17,6 +14,16 @@ data = np.random.randint(100, size=100)
               h1.5              h2.5
 
 """
+
+#generate test data
+#list of 100 random numbers from 1 - 100
+data = []
+data = np.random.randint(100, size=100)
+
+#tensorboard variables
+# logs_path = "C:/Users/Mario/Desktop/tf_logs"
+logs_path = os.getcwd()
+
 #parameters
 num_input = 2
 num_output = 1
@@ -63,6 +70,7 @@ mlp = MLP(x)
 #build loss function
 # loss_op = tf.losses.mean_squared_error(y, mlp)
 loss_op = tf.reduce_mean(mlp)
+accuracy = tf.reduce_mean(tf.square(tf.subtract(y, mlp)))
 
 #build optimizer
 # optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
@@ -74,12 +82,20 @@ vars = [weights["hidden_1"], weights["hidden_2"], weights["out"],
 #create training operator
 train_op = tf.train.GradientDescentOptimizer(learning_rate=learning_rate).minimize(loss_op, var_list=vars)
 
+#create tensorboard variables
+tf.summary.scalar("loss", loss_op)
+tf.summary.scalar("accuracy", accuracy)
+merged_summary_op = tf.summary.merge_all()
+
 #init viriables
 init = tf.global_variables_initializer()
 
 #run training
 with tf.Session() as sess:
     sess.run(init)
+    #write tensorboard logs
+    summary_writer = tf.summary.FileWriter(logs_path, graph=tf.get_default_graph())
+
     total_batch = int(len(data)/batch_size)
 
     #results before training the MLP
@@ -106,8 +122,9 @@ with tf.Session() as sess:
             batch_y = num_1 + num_2
             batch_y = np.reshape(batch_y, (-1, 1))
             #run the training session
-            t, c = sess.run([train_op, loss_op], feed_dict={x: batch_x, y: batch_y})
+            t, c, summary = sess.run([train_op, loss_op, merged_summary_op], feed_dict={x: batch_x, y: batch_y})
             avg_cost += c/total_batch
+            summary_writer.add_summary(summary, epoch * total_batch + i)
             if epoch % 10 == 0 or epoch == 1:
                 #print progress
                 print('Epoch:', (epoch), 'cost =', '{:.3f}'.format(avg_cost))
@@ -124,5 +141,3 @@ with tf.Session() as sess:
     #feed the MLP
     after, x_value, y_value = sess.run([loss_op, x, y], feed_dict={x: test_x, y: test_y})
     print("Before: ", before, " After: ", after)
-    print(x_value)
-    print(y_value)
